@@ -1,5 +1,15 @@
+#include "rclcpp/rclcpp.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "sensor_msgs/msg/joint_state.hpp"
+#include "tf2/LinearMath/Quaternion.h"
 
-// #include "tf2_ros/transform_broadcaster.h"  // <<< CORRECT: ไม่จำเป็นต้องใช้แล้ว
+#include <chrono>
+#include <cmath>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <array>
+#include <vector>
 
 using std::placeholders::_1;
 using namespace std::chrono_literals;
@@ -11,16 +21,17 @@ public:
     {
         this->set_parameter(rclcpp::Parameter("use_sim_time", false));
         
-        declare_parameter("wheel_radius", 0.0635);
-        declare_parameter("wheel_base", 0.4166);
-
-        get_parameter("wheel_radius", wheel_radius_);
-        get_parameter("wheel_base", wheel_base_);
+        // Declare parameters with default values
+        this->declare_parameter("wheel_radius", 0.0635);
+        this->declare_parameter("wheel_base", 0.4166);
         this->declare_parameter("right_wheel_joint", "Right_Wheel_Joint");
         this->declare_parameter("left_wheel_joint", "Left_Wheel_Joint");
-        
-        get_parameter("right_wheel_joint", right_joint_name);
-        get_parameter("left_wheel_joint", left_joint_name);
+
+        // Get parameters
+        wheel_radius_ = this->get_parameter("wheel_radius").as_double();
+        wheel_base_ = this->get_parameter("wheel_base").as_double();
+        right_joint_name = this->get_parameter("right_wheel_joint").as_string();
+        left_joint_name = this->get_parameter("left_wheel_joint").as_string();
         
         joint_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
             "joint_states",
@@ -31,7 +42,7 @@ public:
         // <<< CHANGE 1: เปลี่ยนชื่อ Topic เป็น "odom/raw"
         odom_publisher_ = this->create_publisher<nav_msgs::msg::Odometry>("odom/raw", 10);
         
-        // <<< CHANGE 2: ปิดการทำงานของ TF Broadcaster เพราะ EKF จะทำหน้าที่นี้แทน
+        // <<< CHANGE 2: ปิดการทำงานของ TF Broadcaster ตามที่คุณต้องการ
         // tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
         
         update_timer_ = this->create_wall_timer(
@@ -42,7 +53,6 @@ private:
     void Odometry_sending(const sensor_msgs::msg::JointState &msg)
     {
         std::lock_guard<std::mutex> lock(data_mutex_);
-        auto current_time = this->now();
         
         int left_joint_idx = -1;
         int right_joint_idx = -1;
@@ -57,8 +67,6 @@ private:
         
         joint_pos_[0] = msg.position[left_joint_idx] * wheel_radius_;
         joint_pos_[1] = msg.position[right_joint_idx] * wheel_radius_;
-        
-        // Don't update prev_time_ here, update it in the main loop
     }
 
     void update_odometry() {
@@ -111,6 +119,8 @@ private:
         odom_msg.pose.pose.position.x = x_;
         odom_msg.pose.pose.position.y = y_;
         odom_msg.pose.pose.position.z = 0.0;
+        
+        // Manual Quaternion conversion (Yaw to Quaternion Z, W)
         odom_msg.pose.pose.orientation.z = sin(theta_ / 2.0);
         odom_msg.pose.pose.orientation.w = cos(theta_ / 2.0);
         
@@ -143,12 +153,11 @@ private:
     }
 
     // ==============================================================================
-    // +++ THIS IS THE MISSING PART - DECLARATION OF MEMBER VARIABLES +++
+    // Member Variables Declaration
     // ==============================================================================
     // ROS
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_sub_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_publisher_;
-    // std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_; // Correctly commented out
     rclcpp::TimerBase::SharedPtr update_timer_;
 
     // Parameters
