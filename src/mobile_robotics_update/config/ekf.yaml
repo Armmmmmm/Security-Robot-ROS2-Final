@@ -1,0 +1,44 @@
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0
+    two_d_mode: true
+    publish_acceleration: false
+    publish_tf: true
+
+    map_frame: map              # ถ้าไม่ได้ทำ SLAM ให้ใส่ map หรือ odom ก็ได้
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom           # สำหรับ Local Odometry ให้ใช้ odom
+
+    # --- Sensor 0: Odometry from Wheel Encoders (odom/raw) ---
+    odom0: odom/raw
+    # Config: [x, y, z, 
+    #          r, p, yaw, 
+    #          vx, vy, vz, 
+    #          vr, vp, vyaw, 
+    #          ax, ay, az]
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,   # ใช้ vx จากล้อ (แม่นระยะทาง)
+                   false, false, true,    # ใช้ vyaw จากล้อ (ช่วยเรื่องหมุน)
+                   false, false, false]   # ไม่ใช้ความเร่ง
+    
+    # ถ้าค่า Covariance ใน Code Odometry น้อย (แม่นมาก) EKF จะเชื่อล้อมาก
+    # ถ้าค่า Covariance ใน Code Odometry เยอะ (ไม่แม่น) EKF จะไปเชื่อ IMU แทน
+    odom0_queue_size: 10
+    odom0_nodelay: false
+    odom0_differential: false
+    odom0_relative: false
+
+    # --- Sensor 1: IMU Data (/imu/data) ---
+    imu0: /imu/data
+    imu0_config: [false, false, false,
+                  false, false, false,   # ไม่ใช้ Orientation (ถ้า IMU Drift มากๆ)
+                  false, false, false,
+                  false, false, true,    # ใช้ vyaw จาก Gyro (แม่นการหมุน)
+                  false, false, false]   # ไม่ใช้ความเร่ง (เพราะหุ่นพื้นราบ Gravity กวนได้)
+    
+    imu0_differential: false
+    imu0_relative: true           # ตั้ง true เพื่อให้เริ่มที่ 0 เสมอ
+    imu0_queue_size: 10
+    imu0_remove_gravitational_acceleration: true
